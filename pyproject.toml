@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "fast-insurance-claims"
+version = "0.1.0"
+description = "A FastAPI POC with SQLite and Poetry."
+authors = ["J Mennell"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.110.0"
+uvicorn = {extras = ["standard"], version = "^0.29.0"}
+sqlalchemy = "^2.0.0"
+pydantic = "^2.0.0"
+transformers = "^4.53.3"
+torch = "^2.7.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
