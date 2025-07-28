@@ -13,7 +13,7 @@ st.title("Insurance Claims Reporter")
 # Sidebar navigation
 page = st.sidebar.radio(
     "Navigation",
-    ("Submit Claim", "View All Claims", "View Logs", "Fraud Checker"),
+    ("Submit Claim", "View All Claims", "View Logs", "Fraud Checker", "Agent Query"),
     index=0,
 )
 
@@ -29,23 +29,21 @@ if page == "Submit Claim":
         date_filed = st.date_input("Date Filed")
         submitted = st.form_submit_button("Submit")
         if submitted:
-            resp = requests.post(
-                f"{API_URL}/claims",
-                json={
-                    "claim_number": claim_number,
-                    "claimant_name": claimant_name,
-                    "amount": amount,
-                    "description": description,
-                    "status": status,
-                    "is_approved": is_approved,
-                    "date_filed": str(date_filed),
-                },
-                headers=HEADERS,
-            )
-            try:
-                st.write(resp.json())
-            except Exception:
-                st.error(f"Error: {resp.status_code} - {resp.text}")
+            # Ensure the input data matches the API requirements
+            data = {
+                "claim_number": claim_number,
+                "claimant_name": claimant_name,
+                "amount": amount,
+                "description": description,
+                "status": status,
+                "is_approved": is_approved,
+                "date_filed": str(date_filed),  # Convert date to string
+            }
+            resp = requests.post(f"{API_URL}/claims", json=data, headers=HEADERS)
+            if resp.status_code == 201:
+                st.success("Claim created successfully!")
+            else:
+                st.error(f"Failed to create claim: {resp.text}")
 
 elif page == "View All Claims":
     st.header("All Claims")
@@ -90,6 +88,33 @@ elif page == "Fraud Checker":
                         for label, score in zip(result["labels"], result["scores"])
                     }
                 )
+            else:
+                st.error(f"Error: {resp.status_code} - {resp.text}")
+        except Exception as e:
+            st.error(f"Exception: {e}")
+
+elif page == "Agent Query":
+    st.header("Agent Query")
+    st.write("### Example Questions:")
+    st.markdown(
+        """
+        - What is the status of claim ID 123?
+        - Create a new claim for John Doe with an amount of $500 and claim_number: 123456.
+        - Is claim 456 fraudulent?
+        - Fetch the details of claim ID 789.
+        """
+    )
+    query = st.text_area("Enter your question for the agent")
+    if st.button("Submit Query"):
+        try:
+            resp = requests.post(
+                f"{API_URL}/agent/query",
+                json={"question": query},
+                headers=HEADERS,
+            )
+            if resp.status_code == 200:
+                result = resp.json()
+                st.write(f"**Agent Response:** {result['response']}")
             else:
                 st.error(f"Error: {resp.status_code} - {resp.text}")
         except Exception as e:

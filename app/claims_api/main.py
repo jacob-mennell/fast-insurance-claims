@@ -29,6 +29,7 @@ import toml
 import os
 from . import models, schemas
 from .database import SessionLocal, engine, Base
+from .initialize_agent import agent
 
 
 # --- App and Database Setup ---
@@ -70,6 +71,16 @@ app = FastAPI(
     version="2.0.0",
     dependencies=[Depends(get_api_key)],
 )
+
+
+@app.post("/agent/query", tags=["Agent"])
+def query_agent(request: schemas.AgentQuery):
+    """Handle natural language queries and map them to API tools."""
+    try:
+        response = agent.run(request.question)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- Utility Classes & Functions ---
@@ -192,11 +203,32 @@ async def get_claims_async(
     return db.query(models.Claim).all()
 
 
-@app.get("/claims/{claim_id}", response_model=schemas.Claim, tags=["Claims"])
-def get_claim(claim_id: int, db: Session = Depends(get_db)):
-    claim = db.query(models.Claim).filter(models.Claim.id == claim_id).first()
+@app.get("/claims/{claim_identifier}", response_model=schemas.Claim, tags=["Claims"])
+def get_claim(claim_identifier: str, db: Session = Depends(get_db)):
+    """
+    Fetch a claim by its ID (integer) or claim number (string).
+
+    Args:
+        claim_identifier (str): The unique identifier of the claim, either an integer ID or a string claim number.
+
+    Returns:
+        schemas.Claim: The claim details or a 404 error if not found.
+    """
+    # Try to interpret the identifier as an integer (claim_id)
+    try:
+        claim_id = int(claim_identifier)
+        claim = db.query(models.Claim).filter(models.Claim.id == claim_id).first()
+    except ValueError:
+        # If not an integer, treat it as a claim_number
+        claim = (
+            db.query(models.Claim)
+            .filter(models.Claim.claim_number == claim_identifier)
+            .first()
+        )
+
     if claim is None:
-        raise ClaimNotFound(claim_id)
+        raise ClaimNotFound(claim_identifier)
+
     return claim
 
 

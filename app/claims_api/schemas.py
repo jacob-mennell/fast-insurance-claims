@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 from typing import Optional
-
-
 from datetime import date
 
 
@@ -20,3 +18,7 @@ class Claim(ClaimCreate):
 
     class Config:
         orm_mode = True
+
+
+class AgentQuery(BaseModel):
+    question: str

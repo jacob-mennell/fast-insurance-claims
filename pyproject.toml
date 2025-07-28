@@ -12,6 +12,9 @@ sqlalchemy = "^2.0.0"
 pydantic = "^2.0.0"
 transformers = "^4.53.3"
 torch = "^2.7.1"
+langchain = "^0.3.27"
+langchain-community = "^0.3.27"
+openai = "^1.97.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

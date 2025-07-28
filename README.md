@@ -56,8 +56,8 @@ poetry run uvicorn app.claims_api.main:app --reload
 
 **Terminal 2:** Start the Streamlit frontend:
 ```powershell
-poetry run streamlit run frontend.py
-```
+
+```poetry run streamlit run frontend.py
 
 > Always start the FastAPI server first, then the Streamlit app. The Streamlit UI will call the API at http://localhost:8000.
 
