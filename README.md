@@ -1,4 +1,3 @@
-
 # FastAPI Insurance Claims API POC
 
 This repository demonstrates a production-friendly FastAPI project for managing insurance claims, with a Streamlit frontend for easy interaction. It uses Poetry for environment management, SQLite for storage, and SQLAlchemy for ORM. The project is modular and easy to extend.
@@ -12,6 +11,7 @@ app/
     ├── models.py        # SQLAlchemy models (define DB schema)
     ├── schemas.py       # Pydantic models (data validation)
     ├── database.py      # DB connection & session
+    ├── initialize_agent.py # Agent tools and framework
 frontend.py              # Streamlit UI for API interaction
 claims.db                # SQLite database (auto-created)
 log.txt                  # Claim creation logs
@@ -26,6 +26,7 @@ log.txt                  # Claim creation logs
 - **SQLAlchemy** ORM for database schema and queries
 - **Pydantic** for robust data validation
 - **Async operations** for improved performance (see below)
+- **Agent Framework** for natural language queries mapped to API tools
 - Modular structure for scalability and maintainability
 
 
@@ -56,8 +57,8 @@ poetry run uvicorn app.claims_api.main:app --reload
 
 **Terminal 2:** Start the Streamlit frontend:
 ```powershell
-
-```poetry run streamlit run frontend.py
+poetry run streamlit run frontend.py
+```
 
 > Always start the FastAPI server first, then the Streamlit app. The Streamlit UI will call the API at http://localhost:8000.
 
@@ -70,7 +71,7 @@ Visit [http://localhost:8000/docs](http://localhost:8000/docs) for interactive S
 - `POST /claims` - Create a new insurance claim
 - `GET /claims` - List all claims (with optional status filter)
 - `GET /claims/async` - Async example endpoint
-- `GET /claims/{claim_id}` - Get a claim by ID
+- `GET /claims/{claim_identifier}` - Get a claim by ID or claim number
 - `DELETE /claims/{claim_id}` - Delete a claim by ID
 - `GET /logs` - View claim logs
 - `GET /agent/check_fraud/{claim_id}` - Check if a claim is suspicious/fraudulent
@@ -81,6 +82,7 @@ Visit [http://localhost:8000/docs](http://localhost:8000/docs) for interactive S
 - **View All Claims:** View all claims in a table, with refresh.
 - **View Logs:** View claim logs in a table, with refresh.
 - **Fraud Checker:** Enter a claim ID to check if it is suspicious/fraudulent using an AI model. Displays prediction and probability.
+- **Agent Query:** Use natural language to interact with the API tools (e.g., "What is the status of claim 123?").
 
 
 ## How the Setup Works
@@ -96,6 +98,7 @@ Visit [http://localhost:8000/docs](http://localhost:8000/docs) for interactive S
 
 - **Logging:** Claim creation events are logged to `log.txt` via a background task.
 - **Frontend:** `frontend.py` provides a simple Streamlit UI for creating and viewing claims. Make sure the backend is running before starting Streamlit.
+- **Agent Framework:** The `initialize_agent.py` file defines tools and a custom prompt for handling natural language queries mapped to API actions.
 - **Modularity:** Each concern (API, models, schemas, DB, frontend) is separated for clarity and maintainability.
 
 
@@ -145,8 +148,6 @@ This model ensures that any data sent to your API for creating a claim is valida
 - If you get a 500 Internal Server Error when creating a claim, make sure your database schema matches your models. For dev, delete `claims.db` and restart the backend to recreate the schema.
 - If Streamlit or requests are missing, run `poetry add streamlit requests`.
 - If you have network issues installing dependencies, try again or check your connection.
-
----
 
 ---
 
