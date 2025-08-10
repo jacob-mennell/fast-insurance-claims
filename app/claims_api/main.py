@@ -20,6 +20,7 @@ from fastapi import (
     Request,
     Security,
 )
+from typing import List
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -30,11 +31,11 @@ import os
 from . import models, schemas
 from .database import SessionLocal, engine, Base
 from .initialize_agent import agent
-
+import strawberry
+from strawberry.fastapi import GraphQLRouter
 
 # --- App and Database Setup ---
 Base.metadata.create_all(bind=engine)
-
 
 # Load API key from environment variable (for Azure) or secrets.toml (for local dev)
 API_KEY = os.environ.get("API_KEY")
@@ -71,6 +72,64 @@ app = FastAPI(
     version="2.0.0",
     dependencies=[Depends(get_api_key)],
 )
+
+
+@strawberry.type
+class Query:
+    @strawberry.field
+    def hello(self) -> str:
+        return "Hello from GraphQL!"
+
+    @strawberry.field
+    def claims(
+        self,
+        info,
+        id: int = None,
+        claim_number: str = None,
+        claimant_name: str = None,
+        amount: float = None,
+        status: str = None,
+        date_filed: str = None,
+        description: str = None,
+        is_approved: bool = None,
+    ) -> List[schemas.ClaimType]:
+        db: Session = next(get_db())
+        query = db.query(models.Claim)
+        if id is not None:
+            query = query.filter(models.Claim.id == id)
+        if claim_number is not None:
+            query = query.filter(models.Claim.claim_number == claim_number)
+        if claimant_name is not None:
+            query = query.filter(models.Claim.claimant_name == claimant_name)
+        if amount is not None:
+            query = query.filter(models.Claim.amount == amount)
+        if status is not None:
+            query = query.filter(models.Claim.status == status)
+        if date_filed is not None:
+            query = query.filter(models.Claim.date_filed == date_filed)
+        if description is not None:
+            query = query.filter(models.Claim.description == description)
+        if is_approved is not None:
+            query = query.filter(models.Claim.is_approved == is_approved)
+        db_claims = query.all()
+        return [
+            schemas.ClaimType(
+                id=c.id,
+                claim_number=c.claim_number,
+                claimant_name=c.claimant_name,
+                amount=c.amount,
+                status=c.status,
+                date_filed=c.date_filed,
+                description=c.description,
+                is_approved=c.is_approved,
+            )
+            for c in db_claims
+        ]
+
+
+schema = strawberry.Schema(query=Query)
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/graphql")
 
 
 @app.post("/agent/query", tags=["Agent"])
@@ -171,7 +230,7 @@ def create_claim(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    db_claim = models.Claim(**claim.dict())
+    db_claim = models.Claim(**claim.model_dump())
     db.add(db_claim)
     db.commit()
     db.refresh(db_claim)
@@ -182,9 +241,7 @@ def create_claim(
 
 @app.get("/claims", response_model=list[schemas.Claim], tags=["Claims"])
 def get_claims(
-    status: str = Query(
-        None, description="Filter by claim status (e.g. pending, approved)"
-    ),
+    status: str = Query(),
     db: Session = Depends(get_db),
 ):
     query = db.query(models.Claim)
@@ -232,25 +289,25 @@ def get_claim(claim_identifier: str, db: Session = Depends(get_db)):
     return claim
 
 
-@app.get("/logs", tags=["Logs"])
+@app.get("/logs", response_model=list[schemas.ClaimLog], tags=["Logs"])
 def get_logs(db: Session = Depends(get_db)):
-    """Return all claim logs as a list of dicts for the frontend."""
+    """Return all claim logs as a list of ClaimLog models for the frontend."""
     logs = db.query(models.ClaimLog).all()
-    # Convert SQLAlchemy objects to dicts for JSON serialization
     return [
-        {
-            "id": log.id,
-            "claim_id": log.claim_id,
-            "action": log.action,
-            "message": log.message,
-            "timestamp": str(log.timestamp),
-        }
+        schemas.ClaimLog(
+            id=log.id,
+            claim_id=log.claim_id,
+            action=log.action,
+            message=log.message,
+            timestamp=str(log.timestamp),
+        )
         for log in logs
     ]
 
 
 @app.get(
     "/agent/check_fraud/{claim_id}",
+    response_model=schemas.FraudCheckResult,
     tags=["Agent"],
     summary="Check if a claim is suspicious/fraudulent using a free local model.",
 )
@@ -266,17 +323,15 @@ def check_fraudulent_claim(
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
-    # Prepare claim text (customize as needed)
     claim_text = f"Claimant: {claim.claimant_name}, Amount: {claim.amount}, Status: {claim.status}, Description: {getattr(claim, 'description', '')}"
     classifier = get_fraud_classifier()
     labels = ["fraudulent", "not fraudulent"]
     result = classifier(claim_text, labels)
-    # Return the result with scores
-    return {
-        "claim_id": claim_id,
-        "claim_text": claim_text,
-        "labels": result["labels"],
-        "scores": result["scores"],
-        "predicted_label": result["labels"][0],
-        "fraud_probability": result["scores"][0],
-    }
+    return schemas.FraudCheckResult(
+        claim_id=claim_id,
+        claim_text=claim_text,
+        labels=result["labels"],
+        scores=result["scores"],
+        predicted_label=result["labels"][0],
+        fraud_probability=result["scores"][0],
+    )
