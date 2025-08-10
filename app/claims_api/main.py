@@ -289,25 +289,25 @@ def get_claim(claim_identifier: str, db: Session = Depends(get_db)):
     return claim
 
 
-@app.get("/logs", tags=["Logs"])
+@app.get("/logs", response_model=list[schemas.ClaimLog], tags=["Logs"])
 def get_logs(db: Session = Depends(get_db)):
-    """Return all claim logs as a list of dicts for the frontend."""
+    """Return all claim logs as a list of ClaimLog models for the frontend."""
     logs = db.query(models.ClaimLog).all()
-    # Convert SQLAlchemy objects to dicts for JSON serialization
     return [
-        {
-            "id": log.id,
-            "claim_id": log.claim_id,
-            "action": log.action,
-            "message": log.message,
-            "timestamp": str(log.timestamp),
-        }
+        schemas.ClaimLog(
+            id=log.id,
+            claim_id=log.claim_id,
+            action=log.action,
+            message=log.message,
+            timestamp=str(log.timestamp),
+        )
         for log in logs
     ]
 
 
 @app.get(
     "/agent/check_fraud/{claim_id}",
+    response_model=schemas.FraudCheckResult,
     tags=["Agent"],
     summary="Check if a claim is suspicious/fraudulent using a free local model.",
 )
@@ -323,17 +323,15 @@ def check_fraudulent_claim(
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
-    # Prepare claim text (customize as needed)
     claim_text = f"Claimant: {claim.claimant_name}, Amount: {claim.amount}, Status: {claim.status}, Description: {getattr(claim, 'description', '')}"
     classifier = get_fraud_classifier()
     labels = ["fraudulent", "not fraudulent"]
     result = classifier(claim_text, labels)
-    # Return the result with scores
-    return {
-        "claim_id": claim_id,
-        "claim_text": claim_text,
-        "labels": result["labels"],
-        "scores": result["scores"],
-        "predicted_label": result["labels"][0],
-        "fraud_probability": result["scores"][0],
-    }
+    return schemas.FraudCheckResult(
+        claim_id=claim_id,
+        claim_text=claim_text,
+        labels=result["labels"],
+        scores=result["scores"],
+        predicted_label=result["labels"][0],
+        fraud_probability=result["scores"][0],
+    )
